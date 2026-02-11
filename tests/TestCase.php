@@ -2,9 +2,9 @@
 
 namespace AryaAzadeh\LaravelSeoAudit\Tests;
 
+use AryaAzadeh\LaravelSeoAudit\LaravelSeoAuditServiceProvider;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Orchestra\Testbench\TestCase as Orchestra;
-use AryaAzadeh\LaravelSeoAudit\LaravelSeoAuditServiceProvider;
 
 class TestCase extends Orchestra
 {
