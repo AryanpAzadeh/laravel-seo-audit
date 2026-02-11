@@ -1,84 +1,76 @@
-# This is my package laravel-seo-audit
+# Laravel SEO Audit
 
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/aryaazadeh/laravel-seo-audit.svg?style=flat-square)](https://packagist.org/packages/aryaazadeh/laravel-seo-audit)
 [![GitHub Tests Action Status](https://img.shields.io/github/actions/workflow/status/aryaazadeh/laravel-seo-audit/run-tests.yml?branch=main&label=tests&style=flat-square)](https://github.com/aryaazadeh/laravel-seo-audit/actions?query=workflow%3Arun-tests+branch%3Amain)
-[![GitHub Code Style Action Status](https://img.shields.io/github/actions/workflow/status/aryaazadeh/laravel-seo-audit/fix-php-code-style-issues.yml?branch=main&label=code%20style&style=flat-square)](https://github.com/aryaazadeh/laravel-seo-audit/actions?query=workflow%3A"Fix+PHP+code+style+issues"+branch%3Amain)
-[![Total Downloads](https://img.shields.io/packagist/dt/aryaazadeh/laravel-seo-audit.svg?style=flat-square)](https://packagist.org/packages/aryaazadeh/laravel-seo-audit)
 
-This is where your description should go. Limit it to a paragraph or two. Consider adding a small example.
-
-## Support us
-
-[<img src="https://github-ads.s3.eu-central-1.amazonaws.com/laravel-seo-audit.jpg?t=1" width="419px" />](https://spatie.be/github-ad-click/laravel-seo-audit)
-
-We invest a lot of resources into creating [best in class open source packages](https://spatie.be/open-source). You can support us by [buying one of our paid products](https://spatie.be/open-source/support-us).
-
-We highly appreciate you sending us a postcard from your hometown, mentioning which of our package(s) you are using. You'll find our address on [our contact page](https://spatie.be/about-us). We publish all received postcards on [our virtual postcard wall](https://spatie.be/open-source/postcards).
+Developer-first SEO auditing for Laravel apps with deterministic checks, report persistence, and a protected dashboard.
 
 ## Installation
-
-You can install the package via composer:
 
 ```bash
 composer require aryaazadeh/laravel-seo-audit
 ```
 
-You can publish and run the migrations with:
+Publish migrations and config:
 
 ```bash
 php artisan vendor:publish --tag="laravel-seo-audit-migrations"
+php artisan vendor:publish --tag="laravel-seo-audit-config"
 php artisan migrate
 ```
 
-You can publish the config file with:
+## CLI Usage
+
+Primary command:
 
 ```bash
-php artisan vendor:publish --tag="laravel-seo-audit-config"
+php artisan seo:audit
 ```
 
-This is the contents of the published config file:
-
-```php
-return [
-];
-```
-
-Optionally, you can publish the views using
+Legacy alias (kept for backwards compatibility):
 
 ```bash
-php artisan vendor:publish --tag="laravel-seo-audit-views"
+php artisan laravel-seo-audit
 ```
 
-## Usage
+Useful options:
 
-```php
-$laravelSeoAudit = new AryaAzadeh\LaravelSeoAudit();
-echo $laravelSeoAudit->echoPhrase('Hello, AryaAzadeh!');
+```bash
+php artisan seo:audit --format=json --fail-on=error --output=storage/app/seo-report.json --max-pages=100
 ```
+
+- `--format=table|json|html`
+- `--fail-on=error|critical`
+- `--output=path`
+- `--max-pages=int`
+
+Exit codes:
+
+- `0`: pass
+- `2`: error threshold reached
+- `3`: critical threshold reached
+
+## Dashboard
+
+Route: `/seo-audit/dashboard`
+
+Default protection:
+
+- middleware: `web`, `auth`
+- ability: `viewSeoAudit`
+
+You can configure both in `config/seo-audit.php`.
+
+## AI Layer (v1 Boundary)
+
+The package exposes an AI provider contract but ships with a safe null provider by default.
+
+- interface: `AryaAzadeh\LaravelSeoAudit\Contracts\LlmProviderInterface`
+- default binding: `NullLlmProvider`
+- feature flag: `seo-audit.ai.enabled`
 
 ## Testing
 
 ```bash
 composer test
 ```
-
-## Changelog
-
-Please see [CHANGELOG](CHANGELOG.md) for more information on what has changed recently.
-
-## Contributing
-
-Please see [CONTRIBUTING](CONTRIBUTING.md) for details.
-
-## Security Vulnerabilities
-
-Please review [our security policy](../../security/policy) on how to report security vulnerabilities.
-
-## Credits
-
-- [AryaAzadeh](https://github.com/AryaAzadeh)
-- [All Contributors](../../contributors)
-
-## License
-
-The MIT License (MIT). Please see [License File](LICENSE.md) for more information.
