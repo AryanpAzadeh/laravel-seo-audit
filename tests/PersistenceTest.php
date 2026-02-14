@@ -52,7 +52,8 @@ it('persists audit runs pages and issues', function (): void {
         $table->timestamps();
     });
 
-    $crawler = new class implements CrawlerInterface {
+    $crawler = new class implements CrawlerInterface
+    {
         public function crawl(int $maxPages = 100): array
         {
             return [new CrawlTarget('http://localhost/persist', '/persist', 'route')];
@@ -61,9 +62,9 @@ it('persists audit runs pages and issues', function (): void {
 
     $runner = new AuditRunner(
         $crawler,
-        new HtmlAnalyzer(),
-        new RuleEngine([new TitleExistsRule()]),
-        new SeoScoreCalculator(),
+        new HtmlAnalyzer,
+        new RuleEngine([new TitleExistsRule]),
+        new SeoScoreCalculator,
         app(Kernel::class),
     );
 

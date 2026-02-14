@@ -8,9 +8,9 @@ use AryaAzadeh\LaravelSeoAudit\Rules\TitleExistsRule;
 
 it('aggregates rule issues with expected severities', function (): void {
     $engine = new RuleEngine([
-        new TitleExistsRule(),
-        new MetaDescriptionRule(),
-        new SingleH1Rule(),
+        new TitleExistsRule,
+        new MetaDescriptionRule,
+        new SingleH1Rule,
     ]);
 
     $page = new SeoPageResult(

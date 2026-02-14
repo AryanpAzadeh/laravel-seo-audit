@@ -24,7 +24,7 @@ class HtmlReporter implements ReporterInterface
             );
         })->implode('');
 
-        return "<!doctype html><html><head><meta charset=\"utf-8\"><title>SEO Audit</title></head><body>"
+        return '<!doctype html><html><head><meta charset="utf-8"><title>SEO Audit</title></head><body>'
             .'<h1>SEO Audit Report</h1>'
             .'<p>Score: '.e((string) $summary['score']).'</p>'
             .'<p>Pages: '.e((string) $summary['pages']).' | Issues: '.e((string) $summary['issues']).'</p>'

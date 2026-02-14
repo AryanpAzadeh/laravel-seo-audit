@@ -10,7 +10,7 @@ use AryaAzadeh\LaravelSeoAudit\Enums\Severity;
 it('outputs json and fails with code 2 when fail-on=error and errors exist', function (): void {
     $report = new SeoReport(
         reportVersion: '1.0.0',
-        generatedAt: new \DateTimeImmutable(),
+        generatedAt: new \DateTimeImmutable,
         summary: new SeoRunSummary(
             pages: 1,
             issues: 1,

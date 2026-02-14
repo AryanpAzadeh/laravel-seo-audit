@@ -92,7 +92,7 @@ class AuditRunner
 
         return new SeoReport(
             reportVersion: '1.0.0',
-            generatedAt: new DateTimeImmutable(),
+            generatedAt: new DateTimeImmutable,
             summary: $summary,
             pages: $pages,
         );

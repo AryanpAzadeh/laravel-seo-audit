@@ -2,9 +2,9 @@
 
 namespace AryaAzadeh\LaravelSeoAudit;
 
+use AryaAzadeh\LaravelSeoAudit\Commands\LaravelSeoAuditCommand;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
-use AryaAzadeh\LaravelSeoAudit\Commands\LaravelSeoAuditCommand;
 
 class LaravelSeoAuditServiceProvider extends PackageServiceProvider
 {
