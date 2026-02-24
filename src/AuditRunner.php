@@ -57,7 +57,7 @@ class AuditRunner
     }
 
     /** @return array{0: string|null, 1: int} */
-    private function fetchRouteContentFollowingRedirects(string $path): array
+    private function fetchRouteContentFollowingRedirects(string $path, bool $allowLocalizedRetry = true): array
     {
         $currentPath = $path;
         $visitedPaths = [];
@@ -69,6 +69,13 @@ class AuditRunner
             $content = method_exists($response, 'getContent') ? $response->getContent() : null;
 
             if ($statusCode < 300 || $statusCode >= 400) {
+                if ($allowLocalizedRetry && $statusCode === 404) {
+                    $localizedResult = $this->tryLocalizedPathFallback($path);
+                    if ($localizedResult !== null) {
+                        return $localizedResult;
+                    }
+                }
+
                 return [$content, $statusCode];
             }
 
@@ -92,6 +99,37 @@ class AuditRunner
             method_exists($response, 'getContent') ? $response->getContent() : null,
             method_exists($response, 'getStatusCode') ? $response->getStatusCode() : 500,
         ];
+    }
+
+    /** @return array{0: string|null, 1: int}|null */
+    private function tryLocalizedPathFallback(string $path): ?array
+    {
+        $supportedLocales = array_keys((array) config('laravellocalization.supportedLocales', []));
+        if ($supportedLocales === []) {
+            return null;
+        }
+
+        $preferredLocale = (string) (config('laravellocalization.defaultLocale') ?: config('app.locale', ''));
+        $orderedLocales = $preferredLocale !== ''
+            ? array_values(array_unique(array_merge([$preferredLocale], $supportedLocales)))
+            : $supportedLocales;
+
+        if ($this->pathStartsWithAnyLocale($path, $supportedLocales)) {
+            return null;
+        }
+
+        foreach ($orderedLocales as $locale) {
+            $localizedPath = $path === '/'
+                ? '/'.$locale
+                : '/'.$locale.$path;
+
+            [$content, $statusCode] = $this->fetchRouteContentFollowingRedirects($localizedPath, false);
+            if ($statusCode >= 200 && $statusCode < 400) {
+                return [$content, $statusCode];
+            }
+        }
+
+        return null;
     }
 
     private function normalizeRedirectLocation(string $location): ?string
@@ -121,6 +159,13 @@ class AuditRunner
         }
 
         return $path;
+    }
+
+    private function pathStartsWithAnyLocale(string $path, array $locales): bool
+    {
+        $firstSegment = strtok(trim($path, '/'), '/');
+
+        return is_string($firstSegment) && $firstSegment !== '' && in_array($firstSegment, $locales, true);
     }
 
     /** @param array<int, SeoPageResult> $pages */

@@ -51,6 +51,14 @@ class RouteCrawler implements CrawlerInterface
                 continue;
             }
 
+            $path = $this->applyActiveLocalePrefixIfNeeded(
+                $path,
+                $middlewares,
+                $supportedLocales,
+                $appLocale,
+                $deduplicateLocalized,
+            );
+
             $candidate = new CrawlTarget(
                 url: $baseUrl.$path,
                 path: $path,
@@ -129,5 +137,33 @@ class RouteCrawler implements CrawlerInterface
         }
 
         return null;
+    }
+
+    private function applyActiveLocalePrefixIfNeeded(
+        string $path,
+        array $middlewares,
+        array $supportedLocales,
+        string $appLocale,
+        bool $deduplicateLocalized,
+    ): string {
+        if (! $deduplicateLocalized || $appLocale === '' || ! in_array($appLocale, $supportedLocales, true)) {
+            return $path;
+        }
+
+        if ($this->localePrefix($path, $supportedLocales) !== null) {
+            return $path;
+        }
+
+        $hasLocalizationMiddleware = collect($middlewares)->contains(static function (string $middleware): bool {
+            return in_array($middleware, ['localeSessionRedirect', 'localizationRedirect', 'localeViewPath'], true);
+        });
+
+        if (! $hasLocalizationMiddleware) {
+            return $path;
+        }
+
+        return $path === '/'
+            ? '/'.$appLocale
+            : '/'.$appLocale.$path;
     }
 }

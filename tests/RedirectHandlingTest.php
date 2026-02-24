@@ -56,3 +56,52 @@ it('follows internal route redirects before applying seo rules', function (): vo
         ->and($report->pages[0]->statusCode)->toBe(200)
         ->and($report->pages[0]->issues)->toBe([]);
 });
+
+it('falls back to localized route path when non-prefixed path returns 404', function (): void {
+    config()->set('app.locale', 'fa');
+    config()->set('laravellocalization.supportedLocales', [
+        'fa' => ['name' => 'Farsi'],
+        'en' => ['name' => 'English'],
+    ]);
+
+    $crawler = new class implements CrawlerInterface
+    {
+        public function crawl(int $maxPages = 100): array
+        {
+            return [new CrawlTarget('http://localhost/products', '/products', 'route')];
+        }
+    };
+
+    Route::middleware('web')->get('/products', static fn () => response('404 page', 404));
+    Route::middleware('web')->get('/fa/products', static fn () => <<<'HTML'
+        <!doctype html>
+        <html lang="fa">
+        <head>
+            <title>Localized Products</title>
+            <meta name="description" content="Localized products page description text">
+        </head>
+        <body>
+            <h1>محصولات</h1>
+        </body>
+        </html>
+        HTML);
+
+    $runner = new AuditRunner(
+        $crawler,
+        new HtmlAnalyzer,
+        new RuleEngine([
+            new TitleExistsRule,
+            new MetaDescriptionRule,
+            new SingleH1Rule,
+        ]),
+        new SeoScoreCalculator,
+        app(Kernel::class),
+    );
+
+    $report = $runner->run(10);
+
+    expect($report->summary->issues)->toBe(0)
+        ->and($report->pages)->toHaveCount(1)
+        ->and($report->pages[0]->statusCode)->toBe(200)
+        ->and($report->pages[0]->title)->toBe('Localized Products');
+});
