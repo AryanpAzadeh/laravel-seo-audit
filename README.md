@@ -61,6 +61,13 @@ Default protection:
 
 You can configure both in `config/seo-audit.php`.
 
+## Route Crawl Controls
+
+For multilingual apps and dynamic endpoints, these options help keep reports clean:
+
+- `crawl.exclude_parameterized_routes` (default: `true`) skips routes like `/products/{slug}`.
+- `crawl.deduplicate_localized_routes` (default: `true`) deduplicates locale-prefixed duplicates (for example `/fa/about-us` and `/about-us`).
+
 ## AI Layer (v1 Boundary)
 
 The package exposes an AI provider contract but ships with a safe null provider by default.

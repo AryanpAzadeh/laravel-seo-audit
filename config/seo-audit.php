@@ -7,6 +7,8 @@ return [
             'middleware' => ['web'],
             'exclude_middleware' => ['auth', 'verified', 'password.confirm', 'signed'],
         ],
+        'exclude_parameterized_routes' => true,
+        'deduplicate_localized_routes' => true,
         'http_fallback' => true,
     ],
 
