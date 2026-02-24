@@ -8,6 +8,14 @@ use Illuminate\Routing\Router;
 
 class RouteCrawler implements CrawlerInterface
 {
+    /** @var array<int, string> */
+    private const DEFAULT_SKIPPED_EXTENSIONS = [
+        'jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'ico', 'bmp',
+        'pdf', 'zip', 'rar', '7z', 'tar', 'gz',
+        'mp3', 'wav', 'ogg', 'mp4', 'webm', 'avi', 'mov',
+        'css', 'js', 'json', 'xml', 'txt',
+    ];
+
     public function __construct(private Router $router) {}
 
     public function crawl(int $maxPages = 100): array
@@ -94,16 +102,29 @@ class RouteCrawler implements CrawlerInterface
         }
 
         $targets = array_values($targetsByKey);
-        if (count($targets) > $maxPages) {
-            $targets = array_slice($targets, 0, $maxPages);
-        }
-
         if ($targets === [] && (bool) config('seo-audit.crawl.http_fallback', true)) {
-            $targets[] = new CrawlTarget(
+            $fallbackTarget = new CrawlTarget(
                 url: $baseUrl,
                 path: '/',
                 source: 'http-fallback',
             );
+            $fallbackKey = $this->deduplicationKey($fallbackTarget->path, $fallbackTarget->url, $supportedLocales, $deduplicateLocalized);
+            $targetsByKey[$fallbackKey] = $fallbackTarget;
+        }
+
+        if ((bool) config('seo-audit.crawl.link_discovery.enabled', false)) {
+            $targetsByKey = $this->discoverAdditionalTargets(
+                $targetsByKey,
+                $baseUrl,
+                $supportedLocales,
+                $deduplicateLocalized,
+                $maxPages,
+            );
+        }
+
+        $targets = array_values($targetsByKey);
+        if (count($targets) > $maxPages) {
+            $targets = array_slice($targets, 0, $maxPages);
         }
 
         return $targets;
@@ -165,5 +186,307 @@ class RouteCrawler implements CrawlerInterface
         return $path === '/'
             ? '/'.$appLocale
             : '/'.$appLocale.$path;
+    }
+
+    /**
+     * @param  array<string, CrawlTarget>  $targetsByKey
+     * @param  array<int, string>  $supportedLocales
+     * @return array<string, CrawlTarget>
+     */
+    private function discoverAdditionalTargets(
+        array $targetsByKey,
+        string $baseUrl,
+        array $supportedLocales,
+        bool $deduplicateLocalized,
+        int $maxPages,
+    ): array {
+        $discoveryMaxPages = max(0, (int) config('seo-audit.crawl.link_discovery.max_pages', 120));
+        if ($discoveryMaxPages === 0 || count($targetsByKey) >= $maxPages) {
+            return $targetsByKey;
+        }
+
+        $seedFromRouteTargets = (bool) config('seo-audit.crawl.link_discovery.seed_from_route_targets', true);
+        $seedPaths = (array) config('seo-audit.crawl.link_discovery.seed_paths', ['/']);
+
+        $queue = [];
+        $queued = [];
+
+        if ($seedFromRouteTargets) {
+            foreach ($targetsByKey as $target) {
+                $queue[] = $target;
+                $queued[$target->url] = true;
+            }
+        }
+
+        foreach ($seedPaths as $seedPath) {
+            if (! is_string($seedPath) || $seedPath === '') {
+                continue;
+            }
+
+            $normalizedSeedPath = $this->normalizePath($seedPath);
+            $seedTarget = new CrawlTarget(
+                url: $baseUrl.$normalizedSeedPath,
+                path: $normalizedSeedPath,
+                source: 'discovery-seed',
+            );
+
+            $seedKey = $this->deduplicationKey($seedTarget->path, $seedTarget->url, $supportedLocales, $deduplicateLocalized);
+            if (! isset($targetsByKey[$seedKey])) {
+                $targetsByKey[$seedKey] = $seedTarget;
+            }
+
+            if (! isset($queued[$seedTarget->url])) {
+                $queue[] = $seedTarget;
+                $queued[$seedTarget->url] = true;
+            }
+        }
+
+        $visited = [];
+        $fetchedPages = 0;
+
+        while ($queue !== [] && $fetchedPages < $discoveryMaxPages && count($targetsByKey) < $maxPages) {
+            /** @var CrawlTarget $current */
+            $current = array_shift($queue);
+
+            if (isset($visited[$current->url])) {
+                continue;
+            }
+            $visited[$current->url] = true;
+
+            $html = $this->fetchDiscoveryHtml($current);
+            if (! is_string($html) || trim($html) === '') {
+                continue;
+            }
+
+            $fetchedPages++;
+
+            foreach ($this->extractInternalPathsFromHtml($html, $current->url, $baseUrl) as $path) {
+                $candidate = new CrawlTarget(
+                    url: $baseUrl.$path,
+                    path: $path,
+                    source: 'discovered-link',
+                );
+
+                $key = $this->deduplicationKey($candidate->path, $candidate->url, $supportedLocales, $deduplicateLocalized);
+                if (! isset($targetsByKey[$key])) {
+                    $targetsByKey[$key] = $candidate;
+                }
+
+                if (! isset($queued[$candidate->url])) {
+                    $queue[] = $candidate;
+                    $queued[$candidate->url] = true;
+                }
+
+                if (count($targetsByKey) >= $maxPages) {
+                    break;
+                }
+            }
+        }
+
+        return $targetsByKey;
+    }
+
+    protected function fetchDiscoveryHtml(CrawlTarget $target): ?string
+    {
+        $contents = @file_get_contents($target->url);
+
+        return $contents !== false ? $contents : null;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function extractInternalPathsFromHtml(string $html, string $pageUrl, string $baseUrl): array
+    {
+        if (! class_exists(\DOMDocument::class)) {
+            return [];
+        }
+
+        $document = new \DOMDocument;
+        $internalErrors = libxml_use_internal_errors(true);
+        $loaded = $document->loadHTML($html, LIBXML_NOERROR | LIBXML_NOWARNING | LIBXML_NONET);
+        libxml_clear_errors();
+        libxml_use_internal_errors($internalErrors);
+
+        if (! $loaded) {
+            return [];
+        }
+
+        $xpath = new \DOMXPath($document);
+        $nodes = $xpath->query('//a[@href]');
+        if ($nodes === false) {
+            return [];
+        }
+
+        $paths = [];
+        foreach ($nodes as $node) {
+            if (! $node instanceof \DOMElement) {
+                continue;
+            }
+
+            $href = trim((string) $node->getAttribute('href'));
+            $normalizedPath = $this->normalizeDiscoveredHref($href, $pageUrl, $baseUrl);
+            if ($normalizedPath === null) {
+                continue;
+            }
+
+            $paths[$normalizedPath] = true;
+        }
+
+        return array_keys($paths);
+    }
+
+    private function normalizeDiscoveredHref(string $href, string $pageUrl, string $baseUrl): ?string
+    {
+        if ($href === '' || str_starts_with($href, '#')) {
+            return null;
+        }
+
+        $lowerHref = strtolower($href);
+        if (
+            str_starts_with($lowerHref, 'mailto:')
+            || str_starts_with($lowerHref, 'tel:')
+            || str_starts_with($lowerHref, 'javascript:')
+            || str_starts_with($lowerHref, 'data:')
+        ) {
+            return null;
+        }
+
+        $absoluteUrl = $this->resolveToAbsoluteUrl($href, $pageUrl);
+        if ($absoluteUrl === null) {
+            return null;
+        }
+
+        $parts = parse_url($absoluteUrl);
+        if ($parts === false) {
+            return null;
+        }
+
+        $baseParts = parse_url($baseUrl);
+        if ($baseParts === false) {
+            return null;
+        }
+
+        $baseHost = strtolower((string) ($baseParts['host'] ?? ''));
+        $targetHost = strtolower((string) ($parts['host'] ?? ''));
+        if ($baseHost === '' || $targetHost === '' || $baseHost !== $targetHost) {
+            return null;
+        }
+
+        $path = (string) ($parts['path'] ?? '/');
+        $path = $this->normalizePath($path);
+        if ($path === '' || $path === '/index.php') {
+            $path = '/';
+        }
+
+        if ($this->hasSkippedExtension($path)) {
+            return null;
+        }
+
+        if ((bool) config('seo-audit.crawl.link_discovery.include_query', false) && isset($parts['query']) && $parts['query'] !== '') {
+            $path .= '?'.$parts['query'];
+        }
+
+        return $path;
+    }
+
+    private function resolveToAbsoluteUrl(string $href, string $pageUrl): ?string
+    {
+        $pageParts = parse_url($pageUrl);
+        if ($pageParts === false) {
+            return null;
+        }
+
+        $scheme = (string) ($pageParts['scheme'] ?? 'http');
+        $host = (string) ($pageParts['host'] ?? '');
+        if ($host === '') {
+            return null;
+        }
+
+        $port = isset($pageParts['port']) ? ':'.$pageParts['port'] : '';
+        $authority = $scheme.'://'.$host.$port;
+
+        if (preg_match('/^https?:\/\//i', $href) === 1) {
+            return $href;
+        }
+
+        if (str_starts_with($href, '//')) {
+            return $scheme.':'.$href;
+        }
+
+        $hrefParts = parse_url($href);
+        if ($hrefParts === false) {
+            return null;
+        }
+
+        $hrefPath = (string) ($hrefParts['path'] ?? '');
+        $hrefQuery = isset($hrefParts['query']) && $hrefParts['query'] !== '' ? '?'.$hrefParts['query'] : '';
+
+        if (str_starts_with($href, '/')) {
+            return $authority.$hrefPath.$hrefQuery;
+        }
+
+        $pagePath = (string) ($pageParts['path'] ?? '/');
+        if ($hrefPath === '' && $hrefQuery !== '') {
+            return $authority.$this->normalizePath($pagePath).$hrefQuery;
+        }
+
+        $baseDirectory = str_ends_with($pagePath, '/')
+            ? $pagePath
+            : dirname($pagePath);
+
+        if ($baseDirectory === '\\' || $baseDirectory === '.') {
+            $baseDirectory = '/';
+        }
+
+        $combined = rtrim($baseDirectory, '/').'/'.$hrefPath;
+        $normalizedCombinedPath = $this->removeDotSegments($combined);
+
+        return $authority.$normalizedCombinedPath.$hrefQuery;
+    }
+
+    private function removeDotSegments(string $path): string
+    {
+        $segments = explode('/', $path);
+        $output = [];
+
+        foreach ($segments as $segment) {
+            if ($segment === '' || $segment === '.') {
+                continue;
+            }
+
+            if ($segment === '..') {
+                array_pop($output);
+
+                continue;
+            }
+
+            $output[] = $segment;
+        }
+
+        return '/'.implode('/', $output);
+    }
+
+    private function normalizePath(string $path): string
+    {
+        $normalized = '/'.ltrim($path, '/');
+        $normalized = preg_replace('#/+#', '/', $normalized) ?? $normalized;
+
+        return $normalized !== '/' ? rtrim($normalized, '/') : '/';
+    }
+
+    private function hasSkippedExtension(string $path): bool
+    {
+        $extensions = collect((array) config('seo-audit.crawl.link_discovery.exclude_extensions', self::DEFAULT_SKIPPED_EXTENSIONS))
+            ->filter(static fn ($ext): bool => is_string($ext) && $ext !== '')
+            ->map(static fn (string $ext): string => strtolower(ltrim($ext, '.')))
+            ->values();
+
+        $extension = strtolower((string) pathinfo(parse_url($path, PHP_URL_PATH) ?: $path, PATHINFO_EXTENSION));
+        if ($extension === '') {
+            return false;
+        }
+
+        return $extensions->contains($extension);
     }
 }

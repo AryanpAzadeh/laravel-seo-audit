@@ -76,6 +76,9 @@ For multilingual apps and dynamic endpoints, these options help keep reports cle
 - `crawl.deduplicate_localized_routes` (default: `true`) deduplicates locale-prefixed duplicates (for example `/fa/about-us` and `/about-us`).
 - Internal route redirects are followed before SEO rules are evaluated (for example `/products` -> `/fa/products`).
 - `crawl.route_http_fallback_on_error` (default: `true`) retries route-based targets via real HTTP when internal CLI kernel matching returns `4xx/5xx` unexpectedly.
+- `crawl.link_discovery.enabled` (default: `false`) discovers extra internal links from crawled HTML pages (useful for dynamic slug pages and old content archives).
+- `crawl.link_discovery.seed_paths` controls where discovery starts (default: `['/']`).
+- `crawl.link_discovery.max_pages` limits discovery fetches (default: `120`).
 
 ## AI Layer (v1 Boundary)
 

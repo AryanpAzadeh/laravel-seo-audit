@@ -13,6 +13,14 @@ return [
         // retry by fetching the real URL over HTTP and use that response for analysis.
         'route_http_fallback_on_error' => true,
         'http_fallback' => true,
+        'link_discovery' => [
+            'enabled' => false,
+            'seed_from_route_targets' => true,
+            'seed_paths' => ['/'],
+            'max_pages' => 120,
+            'include_query' => false,
+            'exclude_extensions' => ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'ico', 'pdf', 'zip', 'mp4', 'mp3', 'css', 'js', 'json', 'xml'],
+        ],
     ],
 
     'report' => [

@@ -54,3 +54,40 @@ it('applies active locale prefix for localized middleware routes', function (): 
     expect($paths)->toContain('/fa/products')
         ->and($paths)->not->toContain('/products');
 });
+
+it('discovers additional internal linked pages when link discovery is enabled', function (): void {
+    config()->set('app.url', 'http://example.test');
+    config()->set('seo-audit.crawl.exclude_parameterized_routes', true);
+    config()->set('seo-audit.crawl.link_discovery.enabled', true);
+    config()->set('seo-audit.crawl.link_discovery.seed_from_route_targets', true);
+    config()->set('seo-audit.crawl.link_discovery.max_pages', 10);
+
+    Route::middleware('web')->get('/blog', fn () => 'blog list');
+    Route::middleware('web')->get('/blog/{slug}', fn (string $slug) => $slug);
+
+    $crawler = new class(app('router')) extends RouteCrawler
+    {
+        protected function fetchDiscoveryHtml(\AryaAzadeh\LaravelSeoAudit\Data\CrawlTarget $target): ?string
+        {
+            return match ($target->path) {
+                '/blog' => <<<'HTML'
+                    <a href="/blog/post-1">Post 1</a>
+                    <a href="http://example.test/blog/post-2?utm=abc#top">Post 2</a>
+                    <a href="https://google.com/blog/external">External</a>
+                    HTML,
+                default => null,
+            };
+        }
+    };
+
+    $targets = $crawler->crawl(50);
+    $paths = array_map(static fn ($target): string => $target->path, $targets);
+    $targetsByPath = collect($targets)->keyBy(static fn ($target): string => $target->path);
+
+    expect($paths)->toContain('/blog')
+        ->and($paths)->toContain('/blog/post-1')
+        ->and($paths)->toContain('/blog/post-2')
+        ->and($paths)->not->toContain('/blog/{slug}')
+        ->and($targetsByPath->get('/blog/post-1')->source)->toBe('discovered-link')
+        ->and($targetsByPath->get('/blog/post-2')->source)->toBe('discovered-link');
+});
