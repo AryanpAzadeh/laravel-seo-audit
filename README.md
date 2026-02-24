@@ -61,6 +61,13 @@ Default protection:
 
 You can configure both in `config/seo-audit.php`.
 
+Dashboard capabilities:
+
+- Select any recent run from the run switcher.
+- Track score trend across recent runs.
+- Inspect high-risk pages and rule-level issue share.
+- Filter issues by `severity`, `rule`, and text query (`q`) with pagination.
+
 ## Route Crawl Controls
 
 For multilingual apps and dynamic endpoints, these options help keep reports clean:
