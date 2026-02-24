@@ -64,7 +64,7 @@ class AuditRunner
         $maxRedirects = 3;
 
         for ($i = 0; $i <= $maxRedirects; $i++) {
-            $response = $this->kernel->handle(Request::create($currentPath, 'GET'));
+            $response = $this->kernel->handle($this->makeInternalRequest($currentPath));
             $statusCode = method_exists($response, 'getStatusCode') ? $response->getStatusCode() : 200;
             $content = method_exists($response, 'getContent') ? $response->getContent() : null;
 
@@ -93,7 +93,7 @@ class AuditRunner
             $currentPath = $nextPath;
         }
 
-        $response = $this->kernel->handle(Request::create($currentPath, 'GET'));
+        $response = $this->kernel->handle($this->makeInternalRequest($currentPath));
 
         return [
             method_exists($response, 'getContent') ? $response->getContent() : null,
@@ -166,6 +166,33 @@ class AuditRunner
         $firstSegment = strtok(trim($path, '/'), '/');
 
         return is_string($firstSegment) && $firstSegment !== '' && in_array($firstSegment, $locales, true);
+    }
+
+    private function makeInternalRequest(string $path): Request
+    {
+        $appUrl = (string) config('app.url', 'http://localhost');
+        $parts = parse_url($appUrl);
+
+        $scheme = isset($parts['scheme']) && in_array(strtolower((string) $parts['scheme']), ['http', 'https'], true)
+            ? strtolower((string) $parts['scheme'])
+            : 'http';
+        $host = isset($parts['host']) && $parts['host'] !== '' ? $parts['host'] : 'localhost';
+        $port = $parts['port'] ?? ($scheme === 'https' ? 443 : 80);
+
+        return Request::create(
+            $path,
+            'GET',
+            [],
+            [],
+            [],
+            [
+                'HTTP_HOST' => $host,
+                'SERVER_NAME' => $host,
+                'SERVER_PORT' => (string) $port,
+                'REQUEST_SCHEME' => $scheme,
+                'HTTPS' => $scheme === 'https' ? 'on' : 'off',
+            ],
+        );
     }
 
     /** @param array<int, SeoPageResult> $pages */

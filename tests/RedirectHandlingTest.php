@@ -105,3 +105,47 @@ it('falls back to localized route path when non-prefixed path returns 404', func
         ->and($report->pages[0]->statusCode)->toBe(200)
         ->and($report->pages[0]->title)->toBe('Localized Products');
 });
+
+it('uses app url host when matching route responses', function (): void {
+    config()->set('app.url', 'http://coolak.test');
+
+    $crawler = new class implements CrawlerInterface
+    {
+        public function crawl(int $maxPages = 100): array
+        {
+            return [new CrawlTarget('http://coolak.test/fa/products', '/fa/products', 'route')];
+        }
+    };
+
+    Route::domain('coolak.test')->middleware('web')->get('/fa/products', static fn () => <<<'HTML'
+        <!doctype html>
+        <html lang="fa">
+        <head>
+            <title>Domain Products</title>
+            <meta name="description" content="Domain-bound products page description">
+        </head>
+        <body>
+            <h1>محصولات</h1>
+        </body>
+        </html>
+        HTML);
+
+    $runner = new AuditRunner(
+        $crawler,
+        new HtmlAnalyzer,
+        new RuleEngine([
+            new TitleExistsRule,
+            new MetaDescriptionRule,
+            new SingleH1Rule,
+        ]),
+        new SeoScoreCalculator,
+        app(Kernel::class),
+    );
+
+    $report = $runner->run(10);
+
+    expect($report->summary->issues)->toBe(0)
+        ->and($report->pages)->toHaveCount(1)
+        ->and($report->pages[0]->statusCode)->toBe(200)
+        ->and($report->pages[0]->title)->toBe('Domain Products');
+});
