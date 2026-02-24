@@ -79,6 +79,9 @@ For multilingual apps and dynamic endpoints, these options help keep reports cle
 - `crawl.link_discovery.enabled` (default: `false`) discovers extra internal links from crawled HTML pages (useful for dynamic slug pages and old content archives).
 - `crawl.link_discovery.seed_paths` controls where discovery starts (default: `['/']`).
 - `crawl.link_discovery.max_pages` limits discovery fetches (default: `120`).
+- `crawl.sitemap_discovery.enabled` (default: `false`) imports URLs from sitemap files (`urlset` and `sitemapindex`) for broad historical coverage.
+- `crawl.sitemap_discovery.seed_paths` controls which sitemap files are loaded first (default: `['/sitemap.xml', '/sitemap_index.xml']`).
+- `crawl.sitemap_discovery.max_urls` caps the number of sitemap URLs added to the crawl queue (default: `1000`).
 
 ## AI Layer (v1 Boundary)
 

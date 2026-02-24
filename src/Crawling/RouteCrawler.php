@@ -112,6 +112,16 @@ class RouteCrawler implements CrawlerInterface
             $targetsByKey[$fallbackKey] = $fallbackTarget;
         }
 
+        if ((bool) config('seo-audit.crawl.sitemap_discovery.enabled', false)) {
+            $targetsByKey = $this->discoverTargetsFromSitemaps(
+                $targetsByKey,
+                $baseUrl,
+                $supportedLocales,
+                $deduplicateLocalized,
+                $maxPages,
+            );
+        }
+
         if ((bool) config('seo-audit.crawl.link_discovery.enabled', false)) {
             $targetsByKey = $this->discoverAdditionalTargets(
                 $targetsByKey,
@@ -286,9 +296,156 @@ class RouteCrawler implements CrawlerInterface
         return $targetsByKey;
     }
 
+    /**
+     * @param  array<string, CrawlTarget>  $targetsByKey
+     * @param  array<int, string>  $supportedLocales
+     * @return array<string, CrawlTarget>
+     */
+    private function discoverTargetsFromSitemaps(
+        array $targetsByKey,
+        string $baseUrl,
+        array $supportedLocales,
+        bool $deduplicateLocalized,
+        int $maxPages,
+    ): array {
+        if (count($targetsByKey) >= $maxPages) {
+            return $targetsByKey;
+        }
+
+        $seedPaths = (array) config('seo-audit.crawl.sitemap_discovery.seed_paths', ['/sitemap.xml', '/sitemap_index.xml']);
+        $maxSitemaps = max(1, (int) config('seo-audit.crawl.sitemap_discovery.max_sitemaps', 20));
+        $maxUrls = max(1, (int) config('seo-audit.crawl.sitemap_discovery.max_urls', 1000));
+        $includeQuery = (bool) config('seo-audit.crawl.sitemap_discovery.include_query', false);
+
+        $queue = [];
+        $queuedSitemaps = [];
+        foreach ($seedPaths as $seedPath) {
+            if (! is_string($seedPath) || trim($seedPath) === '') {
+                continue;
+            }
+
+            $normalizedPath = $this->normalizePath($seedPath);
+            $sitemapUrl = $baseUrl.$normalizedPath;
+            $queue[] = $sitemapUrl;
+            $queuedSitemaps[$sitemapUrl] = true;
+        }
+
+        $visitedSitemaps = [];
+        $processedSitemaps = 0;
+        $addedUrls = 0;
+
+        while (
+            $queue !== []
+            && $processedSitemaps < $maxSitemaps
+            && $addedUrls < $maxUrls
+            && count($targetsByKey) < $maxPages
+        ) {
+            $sitemapUrl = array_shift($queue);
+            if (! is_string($sitemapUrl) || isset($visitedSitemaps[$sitemapUrl])) {
+                continue;
+            }
+
+            $visitedSitemaps[$sitemapUrl] = true;
+
+            $xml = $this->fetchSitemapXml($sitemapUrl);
+            if (! is_string($xml) || trim($xml) === '') {
+                continue;
+            }
+
+            $processedSitemaps++;
+            $entries = $this->parseSitemapEntries($xml);
+
+            foreach ($entries['sitemaps'] as $childSitemapUrl) {
+                if (! $this->isSameHost($childSitemapUrl, $baseUrl)) {
+                    continue;
+                }
+
+                if (! isset($queuedSitemaps[$childSitemapUrl]) && ! isset($visitedSitemaps[$childSitemapUrl])) {
+                    $queue[] = $childSitemapUrl;
+                    $queuedSitemaps[$childSitemapUrl] = true;
+                }
+            }
+
+            foreach ($entries['urls'] as $pageUrl) {
+                $path = $this->normalizeUrlForTarget($pageUrl, $baseUrl, $sitemapUrl, $includeQuery, 'sitemap_discovery');
+                if ($path === null) {
+                    continue;
+                }
+
+                $candidate = new CrawlTarget(
+                    url: $baseUrl.$path,
+                    path: $path,
+                    source: 'sitemap',
+                );
+
+                $key = $this->deduplicationKey($candidate->path, $candidate->url, $supportedLocales, $deduplicateLocalized);
+                if (! isset($targetsByKey[$key])) {
+                    $targetsByKey[$key] = $candidate;
+                    $addedUrls++;
+                }
+
+                if ($addedUrls >= $maxUrls || count($targetsByKey) >= $maxPages) {
+                    break;
+                }
+            }
+        }
+
+        return $targetsByKey;
+    }
+
+    protected function fetchSitemapXml(string $url): ?string
+    {
+        return $this->fetchUrlContents($url);
+    }
+
+    /**
+     * @return array{sitemaps: array<int, string>, urls: array<int, string>}
+     */
+    private function parseSitemapEntries(string $xml): array
+    {
+        if (! class_exists(\SimpleXMLElement::class)) {
+            return ['sitemaps' => [], 'urls' => []];
+        }
+
+        $internalErrors = libxml_use_internal_errors(true);
+        $document = simplexml_load_string($xml, \SimpleXMLElement::class, LIBXML_NONET | LIBXML_NOERROR | LIBXML_NOWARNING);
+        libxml_clear_errors();
+        libxml_use_internal_errors($internalErrors);
+
+        if (! $document instanceof \SimpleXMLElement) {
+            return ['sitemaps' => [], 'urls' => []];
+        }
+
+        $sitemaps = [];
+        foreach (($document->xpath('/*[local-name()="sitemapindex"]/*[local-name()="sitemap"]/*[local-name()="loc"]') ?: []) as $node) {
+            $loc = trim((string) $node);
+            if ($loc !== '') {
+                $sitemaps[] = $loc;
+            }
+        }
+
+        $urls = [];
+        foreach (($document->xpath('/*[local-name()="urlset"]/*[local-name()="url"]/*[local-name()="loc"]') ?: []) as $node) {
+            $loc = trim((string) $node);
+            if ($loc !== '') {
+                $urls[] = $loc;
+            }
+        }
+
+        return [
+            'sitemaps' => array_values(array_unique($sitemaps)),
+            'urls' => array_values(array_unique($urls)),
+        ];
+    }
+
     protected function fetchDiscoveryHtml(CrawlTarget $target): ?string
     {
-        $contents = @file_get_contents($target->url);
+        return $this->fetchUrlContents($target->url);
+    }
+
+    protected function fetchUrlContents(string $url): ?string
+    {
+        $contents = @file_get_contents($url);
 
         return $contents !== false ? $contents : null;
     }
@@ -325,7 +482,12 @@ class RouteCrawler implements CrawlerInterface
             }
 
             $href = trim((string) $node->getAttribute('href'));
-            $normalizedPath = $this->normalizeDiscoveredHref($href, $pageUrl, $baseUrl);
+            $normalizedPath = $this->normalizeDiscoveredHref(
+                $href,
+                $pageUrl,
+                $baseUrl,
+                (bool) config('seo-audit.crawl.link_discovery.include_query', false),
+            );
             if ($normalizedPath === null) {
                 continue;
             }
@@ -336,7 +498,12 @@ class RouteCrawler implements CrawlerInterface
         return array_keys($paths);
     }
 
-    private function normalizeDiscoveredHref(string $href, string $pageUrl, string $baseUrl): ?string
+    private function normalizeDiscoveredHref(
+        string $href,
+        string $pageUrl,
+        string $baseUrl,
+        bool $includeQuery,
+    ): ?string
     {
         if ($href === '' || str_starts_with($href, '#')) {
             return null;
@@ -352,42 +519,7 @@ class RouteCrawler implements CrawlerInterface
             return null;
         }
 
-        $absoluteUrl = $this->resolveToAbsoluteUrl($href, $pageUrl);
-        if ($absoluteUrl === null) {
-            return null;
-        }
-
-        $parts = parse_url($absoluteUrl);
-        if ($parts === false) {
-            return null;
-        }
-
-        $baseParts = parse_url($baseUrl);
-        if ($baseParts === false) {
-            return null;
-        }
-
-        $baseHost = strtolower((string) ($baseParts['host'] ?? ''));
-        $targetHost = strtolower((string) ($parts['host'] ?? ''));
-        if ($baseHost === '' || $targetHost === '' || $baseHost !== $targetHost) {
-            return null;
-        }
-
-        $path = (string) ($parts['path'] ?? '/');
-        $path = $this->normalizePath($path);
-        if ($path === '' || $path === '/index.php') {
-            $path = '/';
-        }
-
-        if ($this->hasSkippedExtension($path)) {
-            return null;
-        }
-
-        if ((bool) config('seo-audit.crawl.link_discovery.include_query', false) && isset($parts['query']) && $parts['query'] !== '') {
-            $path .= '?'.$parts['query'];
-        }
-
-        return $path;
+        return $this->normalizeUrlForTarget($href, $baseUrl, $pageUrl, $includeQuery, 'link_discovery');
     }
 
     private function resolveToAbsoluteUrl(string $href, string $pageUrl): ?string
@@ -445,6 +577,54 @@ class RouteCrawler implements CrawlerInterface
         return $authority.$normalizedCombinedPath.$hrefQuery;
     }
 
+    private function normalizeUrlForTarget(
+        string $hrefOrUrl,
+        string $baseUrl,
+        string $contextUrl,
+        bool $includeQuery,
+        string $configScope,
+    ): ?string {
+        $absoluteUrl = $this->resolveToAbsoluteUrl($hrefOrUrl, $contextUrl);
+        if ($absoluteUrl === null || ! $this->isSameHost($absoluteUrl, $baseUrl)) {
+            return null;
+        }
+
+        $parts = parse_url($absoluteUrl);
+        if ($parts === false) {
+            return null;
+        }
+
+        $path = (string) ($parts['path'] ?? '/');
+        $path = $this->normalizePath($path);
+        if ($path === '' || $path === '/index.php') {
+            $path = '/';
+        }
+
+        if ($this->hasSkippedExtension($path, $configScope)) {
+            return null;
+        }
+
+        if ($includeQuery && isset($parts['query']) && $parts['query'] !== '') {
+            $path .= '?'.$parts['query'];
+        }
+
+        return $path;
+    }
+
+    private function isSameHost(string $url, string $baseUrl): bool
+    {
+        $parts = parse_url($url);
+        $baseParts = parse_url($baseUrl);
+        if ($parts === false || $baseParts === false) {
+            return false;
+        }
+
+        $targetHost = strtolower((string) ($parts['host'] ?? ''));
+        $baseHost = strtolower((string) ($baseParts['host'] ?? ''));
+
+        return $targetHost !== '' && $baseHost !== '' && $targetHost === $baseHost;
+    }
+
     private function removeDotSegments(string $path): string
     {
         $segments = explode('/', $path);
@@ -475,9 +655,9 @@ class RouteCrawler implements CrawlerInterface
         return $normalized !== '/' ? rtrim($normalized, '/') : '/';
     }
 
-    private function hasSkippedExtension(string $path): bool
+    private function hasSkippedExtension(string $path, string $configScope = 'link_discovery'): bool
     {
-        $extensions = collect((array) config('seo-audit.crawl.link_discovery.exclude_extensions', self::DEFAULT_SKIPPED_EXTENSIONS))
+        $extensions = collect((array) config('seo-audit.crawl.'.$configScope.'.exclude_extensions', self::DEFAULT_SKIPPED_EXTENSIONS))
             ->filter(static fn ($ext): bool => is_string($ext) && $ext !== '')
             ->map(static fn (string $ext): string => strtolower(ltrim($ext, '.')))
             ->values();

@@ -13,6 +13,14 @@ return [
         // retry by fetching the real URL over HTTP and use that response for analysis.
         'route_http_fallback_on_error' => true,
         'http_fallback' => true,
+        'sitemap_discovery' => [
+            'enabled' => false,
+            'seed_paths' => ['/sitemap.xml', '/sitemap_index.xml'],
+            'max_sitemaps' => 20,
+            'max_urls' => 1000,
+            'include_query' => false,
+            'exclude_extensions' => ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'ico', 'pdf', 'zip', 'mp4', 'mp3', 'css', 'js', 'json', 'xml'],
+        ],
         'link_discovery' => [
             'enabled' => false,
             'seed_from_route_targets' => true,

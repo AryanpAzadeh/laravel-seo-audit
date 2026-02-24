@@ -91,3 +91,51 @@ it('discovers additional internal linked pages when link discovery is enabled', 
         ->and($targetsByPath->get('/blog/post-1')->source)->toBe('discovered-link')
         ->and($targetsByPath->get('/blog/post-2')->source)->toBe('discovered-link');
 });
+
+it('discovers internal pages from sitemap files when sitemap discovery is enabled', function (): void {
+    config()->set('app.url', 'http://example.test');
+    config()->set('seo-audit.crawl.http_fallback', false);
+    config()->set('seo-audit.crawl.sitemap_discovery.enabled', true);
+    config()->set('seo-audit.crawl.sitemap_discovery.seed_paths', ['/sitemap.xml']);
+    config()->set('seo-audit.crawl.sitemap_discovery.max_sitemaps', 5);
+    config()->set('seo-audit.crawl.sitemap_discovery.max_urls', 10);
+    config()->set('seo-audit.crawl.sitemap_discovery.include_query', false);
+
+    Route::middleware('web')->get('/blog', fn () => 'blog');
+
+    $crawler = new class(app('router')) extends RouteCrawler
+    {
+        protected function fetchSitemapXml(string $url): ?string
+        {
+            return match ($url) {
+                'http://example.test/sitemap.xml' => <<<'XML'
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+                        <sitemap><loc>http://example.test/sitemaps/posts.xml</loc></sitemap>
+                    </sitemapindex>
+                    XML,
+                'http://example.test/sitemaps/posts.xml' => <<<'XML'
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+                        <url><loc>http://example.test/blog/post-1</loc></url>
+                        <url><loc>http://example.test/blog/post-2?utm=ad</loc></url>
+                        <url><loc>https://external.test/blog/post-3</loc></url>
+                        <url><loc>http://example.test/storage/seo-report.pdf</loc></url>
+                    </urlset>
+                    XML,
+                default => null,
+            };
+        }
+    };
+
+    $targets = $crawler->crawl(50);
+    $paths = array_map(static fn ($target): string => $target->path, $targets);
+    $targetsByPath = collect($targets)->keyBy(static fn ($target): string => $target->path);
+
+    expect($paths)->toContain('/blog')
+        ->and($paths)->toContain('/blog/post-1')
+        ->and($paths)->toContain('/blog/post-2')
+        ->and($paths)->not->toContain('/storage/seo-report.pdf')
+        ->and($targetsByPath->get('/blog/post-1')->source)->toBe('sitemap')
+        ->and($targetsByPath->get('/blog/post-2')->source)->toBe('sitemap');
+});
