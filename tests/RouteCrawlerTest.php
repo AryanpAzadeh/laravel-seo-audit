@@ -17,6 +17,7 @@ it('crawls only public GET web routes', function (): void {
 it('skips parameterized routes and deduplicates localized routes', function (): void {
     config()->set('seo-audit.crawl.exclude_parameterized_routes', true);
     config()->set('seo-audit.crawl.deduplicate_localized_routes', true);
+    config()->set('app.locale', 'fa');
     config()->set('laravellocalization.supportedLocales', [
         'fa' => ['name' => 'Farsi'],
         'en' => ['name' => 'English'],
@@ -31,6 +32,7 @@ it('skips parameterized routes and deduplicates localized routes', function (): 
     $paths = array_map(static fn ($target): string => $target->path, $targets);
 
     expect($paths)->not->toContain('/products/{slug}')
-        ->and($paths)->toContain('/about-us')
+        ->and($paths)->toContain('/fa/about-us')
+        ->and($paths)->not->toContain('/about-us')
         ->and(collect($paths)->filter(static fn (string $path): bool => str_ends_with($path, '/about-us'))->count())->toBe(1);
 });

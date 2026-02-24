@@ -19,6 +19,7 @@ class RouteCrawler implements CrawlerInterface
         $excludeParameterized = (bool) config('seo-audit.crawl.exclude_parameterized_routes', true);
         $deduplicateLocalized = (bool) config('seo-audit.crawl.deduplicate_localized_routes', true);
         $supportedLocales = array_keys((array) config('laravellocalization.supportedLocales', []));
+        $appLocale = (string) config('app.locale', '');
 
         foreach ($this->router->getRoutes() as $route) {
             $methods = $route->methods();
@@ -66,8 +67,21 @@ class RouteCrawler implements CrawlerInterface
             }
 
             $existing = $targetsByKey[$key];
-            if ($this->isLocalizedPath($existing->path, $supportedLocales) && ! $this->isLocalizedPath($candidate->path, $supportedLocales)) {
+            $existingLocalePrefix = $this->localePrefix($existing->path, $supportedLocales);
+            $candidateLocalePrefix = $this->localePrefix($candidate->path, $supportedLocales);
+
+            // Prefer locale-prefixed path when both localized and non-localized variants exist.
+            if ($existingLocalePrefix === null && $candidateLocalePrefix !== null) {
                 $targetsByKey[$key] = $candidate;
+
+                continue;
+            }
+
+            // If both localized variants exist, prefer the current app locale.
+            if ($existingLocalePrefix !== null && $candidateLocalePrefix !== null && $appLocale !== '') {
+                if ($existingLocalePrefix !== $appLocale && $candidateLocalePrefix === $appLocale) {
+                    $targetsByKey[$key] = $candidate;
+                }
             }
         }
 
@@ -106,10 +120,14 @@ class RouteCrawler implements CrawlerInterface
         return $normalizedPath;
     }
 
-    private function isLocalizedPath(string $path, array $supportedLocales): bool
+    private function localePrefix(string $path, array $supportedLocales): ?string
     {
         $firstSegment = strtok(trim($path, '/'), '/');
 
-        return is_string($firstSegment) && $firstSegment !== '' && in_array($firstSegment, $supportedLocales, true);
+        if (is_string($firstSegment) && $firstSegment !== '' && in_array($firstSegment, $supportedLocales, true)) {
+            return $firstSegment;
+        }
+
+        return null;
     }
 }

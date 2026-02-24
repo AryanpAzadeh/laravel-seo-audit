@@ -67,6 +67,7 @@ For multilingual apps and dynamic endpoints, these options help keep reports cle
 
 - `crawl.exclude_parameterized_routes` (default: `true`) skips routes like `/products/{slug}`.
 - `crawl.deduplicate_localized_routes` (default: `true`) deduplicates locale-prefixed duplicates (for example `/fa/about-us` and `/about-us`).
+- Internal route redirects are followed before SEO rules are evaluated (for example `/products` -> `/fa/products`).
 
 ## AI Layer (v1 Boundary)
 

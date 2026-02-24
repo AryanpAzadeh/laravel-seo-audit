@@ -48,17 +48,79 @@ class AuditRunner
     private function fetchContent(string $path, string $source, string $url): array
     {
         if ($source === 'route') {
-            $response = $this->kernel->handle(Request::create($path, 'GET'));
-
-            return [
-                method_exists($response, 'getContent') ? $response->getContent() : null,
-                method_exists($response, 'getStatusCode') ? $response->getStatusCode() : 200,
-            ];
+            return $this->fetchRouteContentFollowingRedirects($path);
         }
 
         $contents = @file_get_contents($url);
 
         return [$contents !== false ? $contents : null, $contents !== false ? 200 : 500];
+    }
+
+    /** @return array{0: string|null, 1: int} */
+    private function fetchRouteContentFollowingRedirects(string $path): array
+    {
+        $currentPath = $path;
+        $visitedPaths = [];
+        $maxRedirects = 3;
+
+        for ($i = 0; $i <= $maxRedirects; $i++) {
+            $response = $this->kernel->handle(Request::create($currentPath, 'GET'));
+            $statusCode = method_exists($response, 'getStatusCode') ? $response->getStatusCode() : 200;
+            $content = method_exists($response, 'getContent') ? $response->getContent() : null;
+
+            if ($statusCode < 300 || $statusCode >= 400) {
+                return [$content, $statusCode];
+            }
+
+            $location = '';
+            if (property_exists($response, 'headers') && $response->headers !== null && method_exists($response->headers, 'get')) {
+                $location = (string) $response->headers->get('Location', '');
+            }
+            $nextPath = $this->normalizeRedirectLocation($location);
+
+            if ($nextPath === null || in_array($nextPath, $visitedPaths, true)) {
+                return [$content, $statusCode];
+            }
+
+            $visitedPaths[] = $nextPath;
+            $currentPath = $nextPath;
+        }
+
+        $response = $this->kernel->handle(Request::create($currentPath, 'GET'));
+
+        return [
+            method_exists($response, 'getContent') ? $response->getContent() : null,
+            method_exists($response, 'getStatusCode') ? $response->getStatusCode() : 500,
+        ];
+    }
+
+    private function normalizeRedirectLocation(string $location): ?string
+    {
+        if ($location === '') {
+            return null;
+        }
+
+        if (str_starts_with($location, '/')) {
+            return $location;
+        }
+
+        $parts = parse_url($location);
+        if ($parts === false || ! isset($parts['path'])) {
+            return null;
+        }
+
+        $path = $parts['path'];
+        if ($path === '') {
+            $path = '/';
+        } elseif (! str_starts_with($path, '/')) {
+            $path = '/'.$path;
+        }
+
+        if (isset($parts['query']) && $parts['query'] !== '') {
+            $path .= '?'.$parts['query'];
+        }
+
+        return $path;
     }
 
     /** @param array<int, SeoPageResult> $pages */
