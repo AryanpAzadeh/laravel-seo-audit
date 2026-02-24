@@ -9,6 +9,9 @@ return [
         ],
         'exclude_parameterized_routes' => true,
         'deduplicate_localized_routes' => true,
+        // If internal kernel route matching fails in CLI (common with localized route registrars),
+        // retry by fetching the real URL over HTTP and use that response for analysis.
+        'route_http_fallback_on_error' => true,
         'http_fallback' => true,
     ],
 

@@ -48,12 +48,22 @@ class AuditRunner
     private function fetchContent(string $path, string $source, string $url): array
     {
         if ($source === 'route') {
-            return $this->fetchRouteContentFollowingRedirects($path);
+            [$content, $statusCode] = $this->fetchRouteContentFollowingRedirects($path);
+            if (
+                (bool) config('seo-audit.crawl.route_http_fallback_on_error', true)
+                && $statusCode >= 400
+                && $statusCode < 600
+            ) {
+                [$httpContent, $httpStatusCode] = $this->fetchHttpContent($url);
+                if ($httpContent !== null && $httpStatusCode >= 200 && $httpStatusCode < 400) {
+                    return [$httpContent, $httpStatusCode];
+                }
+            }
+
+            return [$content, $statusCode];
         }
 
-        $contents = @file_get_contents($url);
-
-        return [$contents !== false ? $contents : null, $contents !== false ? 200 : 500];
+        return $this->fetchHttpContent($url);
     }
 
     /** @return array{0: string|null, 1: int} */
@@ -193,6 +203,46 @@ class AuditRunner
                 'HTTPS' => $scheme === 'https' ? 'on' : 'off',
             ],
         );
+    }
+
+    /** @return array{0: string|null, 1: int} */
+    protected function fetchHttpContent(string $url): array
+    {
+        $context = stream_context_create([
+            'http' => [
+                'method' => 'GET',
+                'ignore_errors' => true,
+                'follow_location' => 1,
+                'max_redirects' => 3,
+                'timeout' => 10,
+                'header' => "User-Agent: LaravelSeoAudit/1.0\r\n",
+            ],
+        ]);
+
+        $contents = @file_get_contents($url, false, $context);
+        $statusCode = $this->extractStatusCodeFromHeaders($http_response_header ?? []);
+
+        if ($contents === false) {
+            return [null, $statusCode ?? 500];
+        }
+
+        return [$contents, $statusCode ?? 200];
+    }
+
+    /** @param array<int, mixed> $headers */
+    private function extractStatusCodeFromHeaders(array $headers): ?int
+    {
+        foreach (array_reverse($headers) as $header) {
+            if (! is_string($header)) {
+                continue;
+            }
+
+            if (preg_match('/^HTTP\/\S+\s+(\d{3})\b/i', $header, $matches) === 1) {
+                return (int) $matches[1];
+            }
+        }
+
+        return null;
     }
 
     /** @param array<int, SeoPageResult> $pages */
