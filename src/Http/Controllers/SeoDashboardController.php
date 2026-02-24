@@ -9,7 +9,7 @@ class SeoDashboardController
 {
     public function __invoke(): Response
     {
-        $latestRun = AuditRun::query()->with(['pages.issues'])->latest('id')->first();
+        $latestRun = AuditRun::query()->with('pages')->latest('id')->first();
 
         return response()->view('laravel-seo-audit::dashboard', [
             'latestRun' => $latestRun,

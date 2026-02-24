@@ -28,5 +28,6 @@ class TestCase extends Orchestra
     {
         config()->set('database.default', 'testing');
         config()->set('app.url', 'http://localhost');
+        config()->set('app.key', 'base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=');
     }
 }
