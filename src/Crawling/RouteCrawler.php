@@ -503,8 +503,7 @@ class RouteCrawler implements CrawlerInterface
         string $pageUrl,
         string $baseUrl,
         bool $includeQuery,
-    ): ?string
-    {
+    ): ?string {
         if ($href === '' || str_starts_with($href, '#')) {
             return null;
         }
