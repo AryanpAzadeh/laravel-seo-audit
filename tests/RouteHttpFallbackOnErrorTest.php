@@ -23,17 +23,8 @@ it('falls back to http content when route source returns 404 in cli context', fu
         }
     };
 
-    $runner = new class(
-        $crawler,
-        new HtmlAnalyzer,
-        new RuleEngine([
-            new TitleExistsRule,
-            new MetaDescriptionRule,
-            new SingleH1Rule,
-        ]),
-        new SeoScoreCalculator,
-        app(Kernel::class),
-    ) extends AuditRunner {
+    $runner = new class($crawler, new HtmlAnalyzer, new RuleEngine([new TitleExistsRule, new MetaDescriptionRule, new SingleH1Rule]), new SeoScoreCalculator, app(Kernel::class)) extends AuditRunner
+    {
         protected function fetchHttpContent(string $url): array
         {
             expect($url)->toBe('http://coolak.test/fa/products');
