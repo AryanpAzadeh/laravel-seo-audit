@@ -73,6 +73,8 @@ it('discovers additional internal linked pages when link discovery is enabled', 
                 '/blog' => <<<'HTML'
                     <a href="/blog/post-1">Post 1</a>
                     <a href="http://example.test/blog/post-2?utm=abc#top">Post 2</a>
+                    <a href="@example">Handle</a>
+                    <a href="+98 912 000 0000">Invalid phone href</a>
                     <a href="https://google.com/blog/external">External</a>
                     HTML,
                 default => null,
@@ -87,6 +89,8 @@ it('discovers additional internal linked pages when link discovery is enabled', 
     expect($paths)->toContain('/blog')
         ->and($paths)->toContain('/blog/post-1')
         ->and($paths)->toContain('/blog/post-2')
+        ->and($paths)->not->toContain('/@example')
+        ->and($paths)->not->toContain('/+98 912 000 0000')
         ->and($paths)->not->toContain('/blog/{slug}')
         ->and($targetsByPath->get('/blog/post-1')->source)->toBe('discovered-link')
         ->and($targetsByPath->get('/blog/post-2')->source)->toBe('discovered-link');

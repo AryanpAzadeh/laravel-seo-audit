@@ -515,6 +515,7 @@ class RouteCrawler implements CrawlerInterface
             || str_starts_with($lowerHref, 'tel:')
             || str_starts_with($lowerHref, 'javascript:')
             || str_starts_with($lowerHref, 'data:')
+            || $this->isNonNavigationalRelativeHref($href)
         ) {
             return null;
         }
@@ -575,6 +576,25 @@ class RouteCrawler implements CrawlerInterface
         $normalizedCombinedPath = $this->removeDotSegments($combined);
 
         return $authority.$normalizedCombinedPath.$hrefQuery;
+    }
+
+    private function isNonNavigationalRelativeHref(string $href): bool
+    {
+        if (preg_match('/\s/u', $href) === 1) {
+            return true;
+        }
+
+        // Common invalid social handle link (missing absolute URL, e.g. "@example").
+        if (str_starts_with($href, '@') && ! str_contains($href, '/')) {
+            return true;
+        }
+
+        // Common invalid phone link where "tel:" is missing (e.g. "+98 912 000 0000").
+        if (preg_match('/^\+[\d\-\s\(\)]+$/u', $href) === 1) {
+            return true;
+        }
+
+        return false;
     }
 
     private function normalizeUrlForTarget(
