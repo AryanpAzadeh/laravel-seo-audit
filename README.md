@@ -14,8 +14,8 @@ composer require aryaazadeh/laravel-seo-audit
 Publish migrations and config:
 
 ```bash
-php artisan vendor:publish --tag="laravel-seo-audit-migrations"
-php artisan vendor:publish --tag="laravel-seo-audit-config"
+php artisan vendor:publish --tag="seo-audit-migrations"
+php artisan vendor:publish --tag="seo-audit-config"
 php artisan migrate
 ```
 

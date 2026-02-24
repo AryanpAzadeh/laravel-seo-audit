@@ -31,7 +31,11 @@ class LaravelSeoAuditServiceProvider extends PackageServiceProvider
             ->hasConfigFile()
             ->hasViews('laravel-seo-audit')
             ->hasRoute('seo-audit')
-            ->hasMigration('create_laravel_seo_audit_table')
+            ->hasMigrations([
+                'create_seo_audit_runs_table',
+                'create_seo_audit_pages_table',
+                'create_seo_audit_issues_table',
+            ])
             ->hasCommand(LaravelSeoAuditCommand::class);
     }
 
