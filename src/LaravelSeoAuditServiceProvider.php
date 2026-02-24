@@ -3,11 +3,11 @@
 namespace AryaAzadeh\LaravelSeoAudit;
 
 use AryaAzadeh\LaravelSeoAudit\Analysis\HtmlAnalyzer;
+use AryaAzadeh\LaravelSeoAudit\Commands\LaravelSeoAuditCommand;
 use AryaAzadeh\LaravelSeoAudit\Contracts\AnalyzerInterface;
 use AryaAzadeh\LaravelSeoAudit\Contracts\CrawlerInterface;
 use AryaAzadeh\LaravelSeoAudit\Contracts\LlmProviderInterface;
 use AryaAzadeh\LaravelSeoAudit\Crawling\RouteCrawler;
-use AryaAzadeh\LaravelSeoAudit\Commands\LaravelSeoAuditCommand;
 use AryaAzadeh\LaravelSeoAudit\Rules\MetaDescriptionRule;
 use AryaAzadeh\LaravelSeoAudit\Rules\SingleH1Rule;
 use AryaAzadeh\LaravelSeoAudit\Rules\TitleExistsRule;
