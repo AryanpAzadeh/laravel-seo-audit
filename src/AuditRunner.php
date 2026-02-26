@@ -272,6 +272,8 @@ class AuditRunner
             warning: $severityCount[Severity::Warning->value],
             error: $severityCount[Severity::Error->value],
             critical: $severityCount[Severity::Critical->value],
+            technicalScore: $this->scoreCalculator->calculateTechnical($pages),
+            contentScore: $this->scoreCalculator->calculateContent($pages),
         );
 
         return new SeoReport(

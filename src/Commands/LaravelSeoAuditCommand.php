@@ -49,6 +49,8 @@ class LaravelSeoAuditCommand extends Command
             ['Pages', (string) $summary->pages],
             ['Issues', (string) $summary->issues],
             ['Score', (string) $summary->score],
+            ['Technical Score', (string) $summary->technicalScore],
+            ['Content Score', (string) $summary->contentScore],
             ['Info', (string) $summary->info],
             ['Warning', (string) $summary->warning],
             ['Error', (string) $summary->error],

@@ -9,7 +9,7 @@ use AryaAzadeh\LaravelSeoAudit\Enums\Severity;
 use AryaAzadeh\LaravelSeoAudit\Support\ContentSuggestionBuilder;
 use AryaAzadeh\LaravelSeoAudit\Support\FocusKeywordResolver;
 
-class MetaDescriptionRule implements RuleInterface
+class ContentTitleQualityRule implements RuleInterface
 {
     public function __construct(
         private ?ContentSuggestionBuilder $suggestionBuilder = null,
@@ -21,27 +21,37 @@ class MetaDescriptionRule implements RuleInterface
 
     public function name(): string
     {
-        return 'meta_description';
+        return 'content_title_quality';
     }
 
     public function evaluate(SeoPageResult $page): array
     {
-        if ($page->metaDescription !== null) {
+        if ($page->title === null || trim($page->title) === '') {
             return [];
         }
+
+        $min = max(1, (int) config('seo-audit.content.title.min', 30));
+        $max = max($min, (int) config('seo-audit.content.title.max', 60));
+        $length = $page->titleLength > 0 ? $page->titleLength : mb_strlen((string) $page->title);
+
+        if ($length >= $min && $length <= $max) {
+            return [];
+        }
+
+        $focusKeyword = $this->keywordResolver->resolveForUrl($page->url);
+        $suggestedTitle = $this->suggestionBuilder->suggestTitle($page, $focusKeyword);
 
         return [
             new SeoIssue(
                 rule: $this->name(),
-                message: 'Page is missing a meta description.',
+                message: sprintf('Title length should be between %d and %d characters.', $min, $max),
                 severity: Severity::Warning,
                 url: $page->url,
                 context: [
-                    'recommendation' => 'Add a meta description that describes the page value clearly.',
-                    'suggested_meta_description' => $this->suggestionBuilder->suggestMetaDescription(
-                        $page,
-                        $this->keywordResolver->resolveForUrl($page->url),
-                    ),
+                    'title_length' => $length,
+                    'recommended_range' => [$min, $max],
+                    'recommendation' => 'Adjust title length and keep the primary topic near the beginning.',
+                    'suggested_title' => $suggestedTitle,
                 ],
             ),
         ];

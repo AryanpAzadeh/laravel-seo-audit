@@ -430,6 +430,8 @@
     }
     $summaryPages = (int) data_get($pageMetrics ?? [], 'pages', (int) data_get($totals, 'pages', $pagesCollection->count()));
     $summaryIssues = (int) data_get($totals, 'issues', 0);
+    $technicalScore = (int) data_get($totals, 'technical_score', 100);
+    $contentScore = (int) data_get($totals, 'content_score', 100);
     $severityTotals = [
         'info' => (int) data_get($totals, 'info', 0),
         'warning' => (int) data_get($totals, 'warning', 0),
@@ -559,6 +561,16 @@
                 <div class="kpi-label">Total Issues</div>
                 <div class="kpi-value">{{ $summaryIssues }}</div>
                 <div class="kpi-sub">Detected in run</div>
+            </div>
+            <div class="kpi">
+                <div class="kpi-label">Technical Score</div>
+                <div class="kpi-value">{{ $technicalScore }}</div>
+                <div class="kpi-sub">Markup and crawl checks</div>
+            </div>
+            <div class="kpi">
+                <div class="kpi-label">Content Score</div>
+                <div class="kpi-value">{{ $contentScore }}</div>
+                <div class="kpi-sub">Readability and on-page depth</div>
             </div>
             <div class="kpi">
                 <div class="kpi-label">Pass Rate</div>
@@ -753,7 +765,12 @@
                                 <td><span class="sev sev-{{ $issue->severity }}">{{ strtoupper((string) $issue->severity) }}</span></td>
                                 <td>{{ $issue->rule }}</td>
                                 <td class="mono">{{ optional($issue->page)->url ?? '-' }}</td>
-                                <td>{{ $issue->message }}</td>
+                                <td>
+                                    {{ $issue->message }}
+                                    @if(is_array($issue->context) && isset($issue->context['recommendation']) && is_string($issue->context['recommendation']) && trim($issue->context['recommendation']) !== '')
+                                        <div class="small-muted">Suggestion: {{ $issue->context['recommendation'] }}</div>
+                                    @endif
+                                </td>
                             </tr>
                         @empty
                             <tr>

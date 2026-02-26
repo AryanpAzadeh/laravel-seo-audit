@@ -12,6 +12,8 @@ final class SeoRunSummary
         public int $warning,
         public int $error,
         public int $critical,
+        public int $technicalScore = 100,
+        public int $contentScore = 100,
     ) {}
 
     public function toArray(): array
@@ -20,6 +22,8 @@ final class SeoRunSummary
             'pages' => $this->pages,
             'issues' => $this->issues,
             'score' => $this->score,
+            'technical_score' => $this->technicalScore,
+            'content_score' => $this->contentScore,
             'severity' => [
                 'info' => $this->info,
                 'warning' => $this->warning,

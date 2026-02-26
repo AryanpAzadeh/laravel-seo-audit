@@ -8,6 +8,13 @@ use AryaAzadeh\LaravelSeoAudit\Contracts\AnalyzerInterface;
 use AryaAzadeh\LaravelSeoAudit\Contracts\CrawlerInterface;
 use AryaAzadeh\LaravelSeoAudit\Contracts\LlmProviderInterface;
 use AryaAzadeh\LaravelSeoAudit\Crawling\RouteCrawler;
+use AryaAzadeh\LaravelSeoAudit\Rules\ContentFocusKeywordRule;
+use AryaAzadeh\LaravelSeoAudit\Rules\ContentImageAltRule;
+use AryaAzadeh\LaravelSeoAudit\Rules\ContentInternalLinksRule;
+use AryaAzadeh\LaravelSeoAudit\Rules\ContentMetaDescriptionQualityRule;
+use AryaAzadeh\LaravelSeoAudit\Rules\ContentSubheadingRule;
+use AryaAzadeh\LaravelSeoAudit\Rules\ContentTitleQualityRule;
+use AryaAzadeh\LaravelSeoAudit\Rules\ContentWordCountRule;
 use AryaAzadeh\LaravelSeoAudit\Rules\MetaDescriptionRule;
 use AryaAzadeh\LaravelSeoAudit\Rules\SingleH1Rule;
 use AryaAzadeh\LaravelSeoAudit\Rules\TitleExistsRule;
@@ -45,11 +52,25 @@ class LaravelSeoAuditServiceProvider extends PackageServiceProvider
         $this->app->bind(AnalyzerInterface::class, HtmlAnalyzer::class);
 
         $this->app->singleton(RuleEngine::class, static function (): RuleEngine {
-            return new RuleEngine([
+            $rules = [
                 new TitleExistsRule,
                 new MetaDescriptionRule,
                 new SingleH1Rule,
-            ]);
+            ];
+
+            if ((bool) config('seo-audit.content.enabled', true)) {
+                $rules = array_merge($rules, [
+                    new ContentTitleQualityRule,
+                    new ContentMetaDescriptionQualityRule,
+                    new ContentWordCountRule,
+                    new ContentSubheadingRule,
+                    new ContentImageAltRule,
+                    new ContentInternalLinksRule,
+                    new ContentFocusKeywordRule,
+                ]);
+            }
+
+            return new RuleEngine($rules);
         });
 
         $this->app->singleton(NullLlmProvider::class);

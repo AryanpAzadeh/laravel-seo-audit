@@ -68,6 +68,45 @@ Dashboard capabilities:
 - Inspect high-risk pages and rule-level issue share.
 - Filter issues by `severity`, `rule`, and text query (`q`/`search`) with pagination.
 - Apply text search to high-risk pages as well (URL and title matching).
+- View separate `technical_score` and `content_score` beside the overall score.
+
+## Content SEO (Yoast-like)
+
+The package can run deterministic content checks and suggestions in addition to technical checks.
+
+Content checks include:
+
+- Title length quality
+- Meta description length quality
+- Thin content detection (word count)
+- Missing H2 subheadings on long pages
+- Missing image alt coverage
+- Low internal linking on long pages
+- Focus keyword presence in title/meta/H1/opening paragraph
+
+Enable/adjust in `config/seo-audit.php`:
+
+```php
+'content' => [
+    'enabled' => true,
+    'site_name' => 'MYSITE',
+    'title' => ['min' => 30, 'max' => 60],
+    'meta_description' => ['min' => 120, 'max' => 160],
+    'min_word_count' => 300,
+    'focus_keywords' => [
+        '/fa/products/*' => 'محصولات',
+        '/en/products/*' => 'products',
+        // 'regex:/^\\/fa\\/blog\\/.+/' => 'وبلاگ',
+    ],
+],
+```
+
+Suggestions are attached to each issue in `context`, for example:
+
+- `suggested_title`
+- `suggested_meta_description`
+- `recommendation`
+- `missing_in` (for focus keyword placements)
 
 ## Route Crawl Controls
 

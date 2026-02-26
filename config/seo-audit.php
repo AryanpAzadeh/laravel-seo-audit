@@ -37,6 +37,26 @@ return [
         'schema_version' => '1.0.0',
     ],
 
+    'content' => [
+        'enabled' => true,
+        'site_name' => null,
+        'title' => [
+            'min' => 30,
+            'max' => 60,
+        ],
+        'meta_description' => [
+            'min' => 120,
+            'max' => 160,
+        ],
+        'min_word_count' => 300,
+        'min_words_for_subheadings' => 350,
+        'min_words_for_internal_links' => 250,
+        'min_internal_links' => 2,
+        // Wildcard patterns or regex entries (prefix: regex:).
+        // Example: '/fa/products/*' => 'محصولات'
+        'focus_keywords' => [],
+    ],
+
     'ci' => [
         'fail_on' => 'error',
     ],

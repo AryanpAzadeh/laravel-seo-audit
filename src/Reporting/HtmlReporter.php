@@ -27,6 +27,7 @@ class HtmlReporter implements ReporterInterface
         return '<!doctype html><html><head><meta charset="utf-8"><title>SEO Audit</title></head><body>'
             .'<h1>SEO Audit Report</h1>'
             .'<p>Score: '.e((string) $summary['score']).'</p>'
+            .'<p>Technical Score: '.e((string) ($summary['technical_score'] ?? 100)).' | Content Score: '.e((string) ($summary['content_score'] ?? 100)).'</p>'
             .'<p>Pages: '.e((string) $summary['pages']).' | Issues: '.e((string) $summary['issues']).'</p>'
             .'<table border="1" cellpadding="6" cellspacing="0"><thead><tr><th>URL</th><th>Severity</th><th>Rule</th><th>Message</th></tr></thead><tbody>'
             .$rows
