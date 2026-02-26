@@ -32,8 +32,8 @@ class SeoScoreCalculator
     }
 
     /**
-     * @param array<int, SeoPageResult> $pages
-     * @param callable(string):bool $ruleFilter
+     * @param  array<int, SeoPageResult>  $pages
+     * @param  callable(string):bool  $ruleFilter
      */
     private function calculateWithFilter(array $pages, callable $ruleFilter): int
     {
