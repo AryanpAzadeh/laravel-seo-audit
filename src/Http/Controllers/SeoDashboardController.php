@@ -23,6 +23,7 @@ class SeoDashboardController
         $availableRules = collect();
         $recentIssues = $this->emptyPaginator($request);
         $totalIssuesForRun = 0;
+        $filteredPages = collect();
 
         $hasRunsTable = Schema::hasTable('seo_audit_runs');
         $hasPagesTable = Schema::hasTable('seo_audit_pages');
@@ -34,7 +35,7 @@ class SeoDashboardController
             ? $selectedSeverity
             : '';
         $selectedRule = trim((string) $request->query('rule', ''));
-        $searchTerm = trim((string) $request->query('q', ''));
+        $searchTerm = trim((string) $request->query('q', $request->query('search', '')));
 
         if ($hasRunsTable) {
             $recentRuns = AuditRun::query()->latest('id')->limit(20)->get();
@@ -105,6 +106,10 @@ class SeoDashboardController
                     ->paginate(20)
                     ->withQueryString();
             }
+
+            if ($latestRun && $hasPagesTable && $latestRun->relationLoaded('pages')) {
+                $filteredPages = $this->filterPagesBySearchTerm($latestRun->pages, $searchTerm);
+            }
         }
 
         [$summaryPages, $cleanPages, $non2xxPages, $averageWords] = $this->pageMetrics($latestRun, $hasPagesTable);
@@ -130,6 +135,7 @@ class SeoDashboardController
                 'rule' => $selectedRule,
                 'q' => $searchTerm,
             ],
+            'filteredPages' => $filteredPages,
             'totalIssuesForRun' => $totalIssuesForRun,
             'pageMetrics' => [
                 'pages' => $summaryPages,
@@ -174,5 +180,20 @@ class SeoDashboardController
                 'query' => $request->query(),
             ],
         );
+    }
+
+    /** @param Collection<int, mixed> $pages */
+    private function filterPagesBySearchTerm(Collection $pages, string $searchTerm): Collection
+    {
+        if ($searchTerm === '') {
+            return $pages;
+        }
+
+        return $pages->filter(static function ($page) use ($searchTerm): bool {
+            $url = (string) ($page->url ?? '');
+            $title = (string) ($page->title ?? '');
+
+            return stripos($url, $searchTerm) !== false || stripos($title, $searchTerm) !== false;
+        })->values();
     }
 }

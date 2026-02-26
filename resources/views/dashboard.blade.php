@@ -417,7 +417,17 @@
 <body>
 @php
     $totals = is_array($latestRun?->totals) ? $latestRun->totals : [];
+    $selectedRunFilter = data_get($selectedFilters ?? [], 'run');
+    $selectedSeverityFilter = (string) data_get($selectedFilters ?? [], 'severity', '');
+    $selectedRuleFilter = (string) data_get($selectedFilters ?? [], 'rule', '');
+    $selectedSearchFilter = (string) data_get($selectedFilters ?? [], 'q', '');
     $pagesCollection = ($latestRun && $latestRun->relationLoaded('pages')) ? $latestRun->pages : collect();
+    $searchFilteredPagesCollection = collect($filteredPages ?? [])->values();
+    if ($searchFilteredPagesCollection->isEmpty() && $selectedSearchFilter === '') {
+        $searchFilteredPagesCollection = $pagesCollection;
+    } elseif ($selectedSearchFilter !== '' && $searchFilteredPagesCollection->isEmpty()) {
+        $searchFilteredPagesCollection = collect();
+    }
     $summaryPages = (int) data_get($pageMetrics ?? [], 'pages', (int) data_get($totals, 'pages', $pagesCollection->count()));
     $summaryIssues = (int) data_get($totals, 'issues', 0);
     $severityTotals = [
@@ -449,7 +459,7 @@
         })
         ->sortByDesc('count');
 
-    $topRiskPages = $pagesCollection
+    $topRiskPages = $searchFilteredPagesCollection
         ->sortByDesc(static fn ($page) => ((int) $page->issues_count * 1000) + (int) $page->status_code)
         ->take(12)
         ->values();
@@ -465,11 +475,6 @@
 
         return round($x, 2).','.round($y, 2);
     })->implode(' ');
-
-    $selectedRunFilter = data_get($selectedFilters ?? [], 'run');
-    $selectedSeverityFilter = (string) data_get($selectedFilters ?? [], 'severity', '');
-    $selectedRuleFilter = (string) data_get($selectedFilters ?? [], 'rule', '');
-    $selectedSearchFilter = (string) data_get($selectedFilters ?? [], 'q', '');
 
     $passRate = (int) data_get($pageMetrics ?? [], 'pass_rate', 100);
     $cleanPages = (int) data_get($pageMetrics ?? [], 'clean_pages', 0);
@@ -640,7 +645,12 @@
             <section class="panel">
                 <div class="panel-head">
                     <h2>High-Risk Pages</h2>
-                    <span class="small-muted">Top by issues/status</span>
+                    <span class="small-muted">
+                        {{ $topRiskPages->count() }} matched page(s)
+                        @if($selectedSearchFilter !== '')
+                            for search "{{ $selectedSearchFilter }}"
+                        @endif
+                    </span>
                 </div>
                 <div class="table-wrap">
                     <table>

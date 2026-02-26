@@ -66,7 +66,8 @@ Dashboard capabilities:
 - Select any recent run from the run switcher.
 - Track score trend across recent runs.
 - Inspect high-risk pages and rule-level issue share.
-- Filter issues by `severity`, `rule`, and text query (`q`) with pagination.
+- Filter issues by `severity`, `rule`, and text query (`q`/`search`) with pagination.
+- Apply text search to high-risk pages as well (URL and title matching).
 
 ## Route Crawl Controls
 
